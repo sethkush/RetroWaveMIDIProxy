@@ -1,0 +1,20 @@
+# Copy all .wopl bank files from source banks/ and exported banks/ to build output banks/
+set(SRC_DIR "@CMAKE_SOURCE_DIR@/banks")
+set(EXPORTED_DIR "@CMAKE_BINARY_DIR@/banks/exported")
+set(DST_DIR "@CMAKE_CURRENT_BINARY_DIR@/banks")
+
+file(MAKE_DIRECTORY "${DST_DIR}")
+
+# Copy user-provided banks from source tree
+file(GLOB WOPL_FILES "${SRC_DIR}/*.wopl")
+foreach(F ${WOPL_FILES})
+    get_filename_component(FNAME "${F}" NAME)
+    file(COPY_FILE "${F}" "${DST_DIR}/${FNAME}" ONLY_IF_DIFFERENT)
+endforeach()
+
+# Copy exported libADLMIDI banks
+file(GLOB EXPORTED_FILES "${EXPORTED_DIR}/*.wopl")
+foreach(F ${EXPORTED_FILES})
+    get_filename_component(FNAME "${F}" NAME)
+    file(COPY_FILE "${F}" "${DST_DIR}/${FNAME}" ONLY_IF_DIFFERENT)
+endforeach()

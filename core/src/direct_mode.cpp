@@ -192,10 +192,17 @@ void DirectMode::handle_cc(uint8_t ch, uint8_t cc, uint8_t val)
 	case 120: cc_all_sound_off(ch); break;
 	case 123: cc_all_notes_off(ch); break;
 
-	// NRPN state machine
-	case 99: cs.nrpn_msb = val; break;     // NRPN MSB
-	case 98: cs.nrpn_lsb = val; break;     // NRPN LSB
-	case 6:  nrpn_data_entry(ch, val); break; // Data Entry MSB
+	// NRPN addressing (invalidates RPN)
+	case 99: cs.nrpn_msb = val; cs.rpn_msb = cs.rpn_lsb = 0x7F; break;
+	case 98: cs.nrpn_lsb = val; cs.rpn_msb = cs.rpn_lsb = 0x7F; break;
+
+	// RPN addressing (invalidates NRPN)
+	case 101: cs.rpn_msb = val; cs.nrpn_msb = cs.nrpn_lsb = 0x7F; break;
+	case 100: cs.rpn_lsb = val; cs.nrpn_msb = cs.nrpn_lsb = 0x7F; break;
+
+	// Data Entry
+	case 6:  data_entry_msb(ch, val); break;
+	case 38: data_entry_lsb(ch, val); break;
 
 	default:
 		break;
@@ -350,9 +357,9 @@ void DirectMode::handle_pitch_bend(uint8_t ch, uint16_t bend)
 	if (cs.current_note < 0)
 		return;
 
-	// Bend range: +/- 2 semitones. Center = 8192.
-	// Compute pitch offset in semitones, then re-lookup frequency.
-	double semitones = (static_cast<int>(bend) - 8192) * 2.0 / 8192.0;
+	// Bend range from RPN 0x0000 (default ±2 semitones). Center = 8192.
+	double range = cs.bend_range_semitones + cs.bend_range_cents / 100.0;
+	double semitones = (static_cast<int>(bend) - 8192) * range / 8192.0;
 	double freq = 440.0 * std::pow(2.0, (cs.current_note - 69.0 + semitones) / 12.0);
 
 	// Convert to F-Num + Block
@@ -386,13 +393,44 @@ void DirectMode::handle_pitch_bend(uint8_t ch, uint16_t bend)
 
 // --- NRPN ---
 
+void DirectMode::data_entry_msb(uint8_t ch, uint8_t val)
+{
+	auto &cs = channels_[ch];
+	if (cs.nrpn_msb != 0x7F && cs.nrpn_lsb != 0x7F) {
+		nrpn_data_entry(ch, val);
+	} else if (cs.rpn_msb != 0x7F && cs.rpn_lsb != 0x7F) {
+		rpn_data_entry(ch, cs.rpn_msb, cs.rpn_lsb, val);
+	}
+}
+
+void DirectMode::data_entry_lsb(uint8_t ch, uint8_t val)
+{
+	auto &cs = channels_[ch];
+	if (cs.rpn_msb != 0x7F && cs.rpn_lsb != 0x7F) {
+		rpn_data_entry_lsb(ch, cs.rpn_msb, cs.rpn_lsb, val);
+	}
+}
+
 void DirectMode::nrpn_data_entry(uint8_t ch, uint8_t val)
 {
 	auto &cs = channels_[ch];
-	if (cs.nrpn_msb == 0x7F || cs.nrpn_lsb == 0x7F)
-		return; // NRPN not set
-
 	nrpn_apply(ch, cs.nrpn_msb, cs.nrpn_lsb, val);
+}
+
+void DirectMode::rpn_data_entry(uint8_t ch, uint8_t msb, uint8_t lsb, uint8_t val)
+{
+	if (msb == 0 && lsb == 0) {
+		// RPN 0x0000: Pitch Bend Sensitivity — CC6 = semitones
+		channels_[ch].bend_range_semitones = val;
+	}
+}
+
+void DirectMode::rpn_data_entry_lsb(uint8_t ch, uint8_t msb, uint8_t lsb, uint8_t val)
+{
+	if (msb == 0 && lsb == 0) {
+		// RPN 0x0000: Pitch Bend Sensitivity — CC38 = cents
+		channels_[ch].bend_range_cents = val;
+	}
 }
 
 void DirectMode::direct_nrpn(uint8_t ch, uint8_t msb, uint8_t lsb, uint8_t val)

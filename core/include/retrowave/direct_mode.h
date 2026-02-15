@@ -56,6 +56,10 @@ public:
 		bool sustain = false;       // CC64
 		uint8_t nrpn_msb = 0x7F;   // CC99 (0x7F = null/inactive)
 		uint8_t nrpn_lsb = 0x7F;   // CC98
+		uint8_t rpn_msb = 0x7F;    // CC101 (0x7F = null/inactive)
+		uint8_t rpn_lsb = 0x7F;    // CC100
+		uint8_t bend_range_semitones = 2;
+		uint8_t bend_range_cents = 0;
 		int8_t current_note = -1;   // Currently sounding note (-1 = none)
 		bool sustained_note = false; // Note held by sustain pedal
 		uint8_t note_velocity = 0;
@@ -128,8 +132,12 @@ private:
 	void cc_all_sound_off(uint8_t ch);
 	void cc_all_notes_off(uint8_t ch);
 
-	// NRPN state machine
+	// NRPN/RPN state machine
 	void nrpn_data_entry(uint8_t ch, uint8_t val);
+	void data_entry_msb(uint8_t ch, uint8_t val);
+	void data_entry_lsb(uint8_t ch, uint8_t val);
+	void rpn_data_entry(uint8_t ch, uint8_t msb, uint8_t lsb, uint8_t val);
+	void rpn_data_entry_lsb(uint8_t ch, uint8_t msb, uint8_t lsb, uint8_t val);
 	void nrpn_apply(uint8_t ch, uint8_t msb, uint8_t lsb, uint8_t val);
 	void nrpn_operator(uint8_t ch, uint8_t op_idx, uint8_t param, uint8_t val);
 	void nrpn_channel(uint8_t ch, uint8_t param, uint8_t val);

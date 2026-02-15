@@ -298,7 +298,8 @@ void VoiceAllocator::handle_note_on(uint8_t midi_ch, uint8_t note, uint8_t vel)
 
 		// Apply pitch bend if active
 		if (mcs.pitch_bend != 8192) {
-			double semitones = (static_cast<int>(mcs.pitch_bend) - 8192) * 2.0 / 8192.0;
+			double range = mcs.bend_range_semitones + mcs.bend_range_cents / 100.0;
+			double semitones = (static_cast<int>(mcs.pitch_bend) - 8192) * range / 8192.0;
 			double freq = 440.0 * std::pow(2.0, (note - 69.0 + semitones) / 12.0);
 
 			// Apply unison detune on top of bend
@@ -419,11 +420,42 @@ void VoiceAllocator::handle_cc(uint8_t midi_ch, uint8_t cc, uint8_t val)
 		}
 		break;
 	}
+
+	// NRPN addressing (invalidates RPN)
+	case 99: mcs.nrpn_msb = val; mcs.rpn_msb = mcs.rpn_lsb = 0x7F; break;
+	case 98: mcs.nrpn_lsb = val; mcs.rpn_msb = mcs.rpn_lsb = 0x7F; break;
+
+	// RPN addressing (invalidates NRPN)
+	case 101: mcs.rpn_msb = val; mcs.nrpn_msb = mcs.nrpn_lsb = 0x7F; break;
+	case 100: mcs.rpn_lsb = val; mcs.nrpn_msb = mcs.nrpn_lsb = 0x7F; break;
+
+	// Data Entry MSB
+	case 6:
+		if (mcs.nrpn_msb != 0x7F && mcs.nrpn_lsb != 0x7F) {
+			// Forward NRPN to all assigned OPL3 channels
+			for (uint8_t opl3_ch : mcs.config.opl3_channels)
+				dm_.direct_nrpn(opl3_ch, mcs.nrpn_msb, mcs.nrpn_lsb, val);
+		} else if (mcs.rpn_msb == 0 && mcs.rpn_lsb == 0) {
+			// RPN 0x0000: Pitch Bend Sensitivity — semitones
+			mcs.bend_range_semitones = val;
+		}
+		return; // Don't broadcast parameter addressing CCs
+	// Data Entry LSB
+	case 38:
+		if (mcs.rpn_msb == 0 && mcs.rpn_lsb == 0) {
+			// RPN 0x0000: Pitch Bend Sensitivity — cents
+			mcs.bend_range_cents = val;
+		}
+		return;
+
 	default:
 		break;
 	}
 
 	// Broadcast CC to all assigned OPL3 channels
+	// (skip for NRPN/RPN addressing CCs — consumed above)
+	if (cc == 99 || cc == 98 || cc == 101 || cc == 100)
+		return;
 	for (uint8_t opl3_ch : mcs.config.opl3_channels) {
 		dm_.apply_cc_to_channel(opl3_ch, cc, val);
 	}
@@ -450,7 +482,8 @@ void VoiceAllocator::recompute_bend(uint8_t midi_ch)
 		auto &v = mcs.voices[i];
 		if (v.note < 0) continue;
 
-		double semitones = (static_cast<int>(mcs.pitch_bend) - 8192) * 2.0 / 8192.0;
+		double range = mcs.bend_range_semitones + mcs.bend_range_cents / 100.0;
+		double semitones = (static_cast<int>(mcs.pitch_bend) - 8192) * range / 8192.0;
 		double freq = 440.0 * std::pow(2.0, (v.note - 69.0 + semitones) / 12.0);
 
 		// Apply unison detune

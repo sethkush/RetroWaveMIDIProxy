@@ -107,6 +107,12 @@ private:
 		uint8_t brightness = 64;
 		bool sustain = false;
 		uint16_t pitch_bend = 8192; // center
+		uint8_t bend_range_semitones = 2;
+		uint8_t bend_range_cents = 0;
+		uint8_t nrpn_msb = 0x7F;
+		uint8_t nrpn_lsb = 0x7F;
+		uint8_t rpn_msb = 0x7F;
+		uint8_t rpn_lsb = 0x7F;
 	};
 
 	void handle_note_on(uint8_t midi_ch, uint8_t note, uint8_t vel);

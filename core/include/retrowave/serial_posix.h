@@ -1,7 +1,5 @@
 /*
-    This file is part of RetroWaveMIDIProxyGUI
-    Copyright (C) 2023 Reimu NotMoe <reimu@sudomaker.com>
-    Copyright (C) 2023 Yukino Song <yukino@sudomaker.com>
+    This file is part of RetroWaveMIDIProxy
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as
@@ -17,14 +15,27 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "mainwindow.h"
+#pragma once
 
-#include <QApplication>
+#include <retrowave/serial_port.h>
 
-int main(int argc, char *argv[])
-{
-    QApplication a(argc, argv);
-    MainWindow w;
-    w.show();
-    return a.exec();
-}
+namespace retrowave {
+
+class PosixSerialPort : public SerialPort {
+public:
+	PosixSerialPort() = default;
+	~PosixSerialPort() override;
+
+	PosixSerialPort(const PosixSerialPort &) = delete;
+	PosixSerialPort &operator=(const PosixSerialPort &) = delete;
+
+	bool open(const std::string &port_name) override;
+	void close() override;
+	bool is_open() const override;
+	bool write(const uint8_t *data, size_t len) override;
+
+private:
+	int fd_ = -1;
+};
+
+} // namespace retrowave

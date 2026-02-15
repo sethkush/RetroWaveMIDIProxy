@@ -1,0 +1,15 @@
+[Unit]
+Description=RetroWave MIDI Proxy Daemon
+After=dev-ttyUSB0.device
+Wants=dev-ttyUSB0.device
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/retrowave-midi-cli -s /dev/ttyUSB0 -m virtual -M bank -b 58
+Restart=on-failure
+RestartSec=5
+User=retrowave
+Group=dialout
+
+[Install]
+WantedBy=multi-user.target
